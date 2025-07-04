@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Details</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            color: #333;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: white;
+            transform: translateY(-2px);
+        }
+
+        .property-detail {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .property-header {
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .property-title {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .property-type {
+            display: inline-block;
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .property-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .main-content {
+            space-y: 30px;
+        }
+
+        .media-gallery {
+            margin-bottom: 30px;
+        }
+
+        .media-item {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .media-item:hover {
+            transform: scale(1.02);
+        }
+
+        .property-details {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .detail-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.1em;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .description {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .description h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .description p {
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .sidebar {
+            space-y: 20px;
+        }
+
+        .price-card {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .price {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .price-type {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .contact-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .contact-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .contact-info {
+            text-align: center;
+            font-size: 1.2em;
+            color: #27ae60;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .share-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-share {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+        }
+
+        .btn-whatsapp {
+            background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+            color: white;
+        }
+
+        .btn-call {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: white;
+        }
+
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .property-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .property-title {
+                font-size: 1.8em;
+            }
+            
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Properties
+        </a>
+        
+        <div id="propertyContainer">
+            <div class="loading">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p>Loading property details...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getPropertyId() {
+            const path = window.location.pathname;
+            return path.split('/')[2];
+        }
+
+        async function loadProperty() {
+            const propertyId = getPropertyId();
+            
+            try {
+                const response = await fetch(`/api/properties/${propertyId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Property not found');
+                }
+                
+                const property = await response.json();
+                displayProperty(property);
+            } catch (error) {
+                console.error('Error loading property:', error);
+                document.getElementById('propertyContainer').innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        <p>Property not found or error loading details</p>
+                    </div>
+                `;
+            }
+        }
+
+        function displayProperty(property) {
+            const html = `
+                <div class="property-detail">
+                    <div class="property-header">
+                        <div class="property-title">${property.title}</div>
+                        <span class="property-type">${property.type}</span>
+                    </div>
+                    
+                    <div class="property-content">
+                        <div class="main-content">
+                            ${property.images && property.images.length > 0 ? `
+                                <div class="media-gallery">
+                                    <h3 style="margin-bottom: 15px; color: #2c3e50;">Images</h3>
+                                    ${property.images.map(img => `
+                                        <img src="${img}" alt="Property Image" class="media-item" onclick="openImage('${img}')">
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${property.videos && property.videos.length > 0 ? `
+                                <div class="media-gallery">
+                                    <h3 style="margin-bottom: 15px; color: #2c3e50;">Videos</h3>
+                                    ${property.videos.map(video => `
+                                        <video src="${video}" class="media-item" controls></video>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            <div class="property-details">
+                                <h3 style="margin-bottom: 20px; color: #2c3e50;">Property Details</h3>
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <div class="detail-label">BHK</div>
+                                        <div class="detail-value">${property.bhk}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Area</div>
+                                        <div class="detail-value">${property.area} Sq Ft</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Location</div>
+                                        <div class="detail-value">${property.location}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Facing</div>
+                                        <div class="detail-value">${property.facing}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Furnished</div>
+                                        <div class="detail-value">${property.furnished}</div>
+                                    </div>
+                                    <div class="detail-item">
+                                        <div class="detail-label">Parking</div>
+                                        <div class="detail-value">${property.parking}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="description">
+                                <h3>Description</h3>
+                                <p>${property.description}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="sidebar">
+                            <div class="price-card">
+                                <div class="price">₹${property.price}</div>
+                                <div class="price-type">${property.type === 'sale' ? 'Crores' : 'Lakh/month'}</div>
+                            </div>
+                            
+                            <div class="contact-card">
+                                <h3><i class="fas fa-phone"></i> Contact</h3>
+                                <div class="contact-info">${property.contact}</div>
+                                <button class="btn btn-call" onclick="callAgent('${property.contact}')">
+                                    <i class="fas fa-phone"></i> Call Now
+                                </button>
+                                <button class="btn btn-whatsapp" onclick="whatsappAgent('${property.contact}', '${property.title}')">
+                                    <i class="fab fa-whatsapp"></i> WhatsApp
+                                </button>
+                            </div>
+                            
+                            <div class="share-card">
+                                <h3><i class="fas fa-share-alt"></i> Share</h3>
+                                <button class="btn btn-share" onclick="shareProperty()">
+                                    <i class="fas fa-share-alt"></i> Share Property
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('propertyContainer').innerHTML = html;
+            
+            // Update page title
+            document.title = `${property.title} - Property Details`;
+        }
+
+        function openImage(src) {
+            window.open(src, '_blank');
+        }
+
+        function callAgent(phone) {
+            window.location.href = `tel:${phone}`;
+        }
+
+        function whatsappAgent(phone, propertyTitle) {
+            const message = `Hi, I'm interested in the property: ${propertyTitle}`;
+            const whatsappUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        async function shareProperty() {
+            const propertyId = getPropertyId();
+            
+            try {
+                const response = await fetch(`/api/share/${propertyId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const shareText = `Check out this property: ${data.property.title}\n${data.property.bhk} - ${data.property.area} Sq Ft\nLocation: ${data.property.location}\nPrice: ₹${data.property.price} ${data.property.type === 'sale' ? 'Cr' : 'Lakh/month'}\nContact: ${data.property.contact}\n\n${data.shareUrl}`;
+                    
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: data.property.title,
+                            text: shareText,
+                            url: data.shareUrl
+                        });
+                    } else {
+                        await navigator.clipboard.writeText(shareText);
+                        alert('Property details copied to clipboard!');
+                    }
+                } else {
+                    alert('Error sharing property');
+                }
+            } catch (error) {
+                console.error('Error sharing property:', error);
+                alert('Error sharing property');
+            }
+        }
+
+        // Initialize
+        loadProperty();
+    </script>
+</body>
+</html>
