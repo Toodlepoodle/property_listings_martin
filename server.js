@@ -3,16 +3,33 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'adiiroy67@gmail.com';
+const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD || 'ggji sbkc bufx iyqa';
+
+// Email configuration
+const transporter = nodemailer.createTransporter({
+    service: 'gmail', // or your email service
+    auth: {
+        user: ADMIN_EMAIL,
+        pass: EMAIL_PASSWORD
+    }
+});
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
-app.use('/media', express.static('media')); // New media folder
+app.use('/media', express.static('media'));
 app.use(express.static('public'));
 
 // Create necessary directories
@@ -26,6 +43,8 @@ directories.forEach(dir => {
 // Database file paths
 const DB_FILE = path.join(__dirname, 'data', 'properties.json');
 const MEDIA_DB_FILE = path.join(__dirname, 'data', 'media.json');
+const REQUIREMENTS_DB_FILE = path.join(__dirname, 'data', 'requirements.json');
+const USERS_DB_FILE = path.join(__dirname, 'data', 'users.json');
 
 // Configure multer for property uploads
 const storage = multer.diskStorage({
@@ -52,37 +71,25 @@ const mediaStorage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB limit
-    },
+    limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|pdf/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = allowedTypes.test(file.mimetype);
-        
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb('Error: Only images, videos, and PDFs allowed!');
-        }
+        if (mimetype && extname) return cb(null, true);
+        cb('Error: Only images, videos, and PDFs allowed!');
     }
 });
 
 const mediaUpload = multer({ 
     storage: mediaStorage,
-    limits: {
-        fileSize: 100 * 1024 * 1024 // 100MB limit for media
-    },
+    limits: { fileSize: 100 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|webm|mkv/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = allowedTypes.test(file.mimetype);
-        
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb('Error: Only images and videos allowed!');
-        }
+        if (mimetype && extname) return cb(null, true);
+        cb('Error: Only images and videos allowed!');
     }
 });
 
@@ -133,7 +140,177 @@ function saveMedia(data) {
     }
 }
 
-// Initialize database with enhanced sample properties
+function loadRequirements() {
+    try {
+        if (fs.existsSync(REQUIREMENTS_DB_FILE)) {
+            const data = fs.readFileSync(REQUIREMENTS_DB_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+        return { requirements: [], nextId: 1 };
+    } catch (error) {
+        console.error('Error loading requirements:', error);
+        return { requirements: [], nextId: 1 };
+    }
+}
+
+function saveRequirements(data) {
+    try {
+        fs.writeFileSync(REQUIREMENTS_DB_FILE, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving requirements:', error);
+        return false;
+    }
+}
+
+function loadUsers() {
+    try {
+        if (fs.existsSync(USERS_DB_FILE)) {
+            const data = fs.readFileSync(USERS_DB_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+        return { users: [], nextId: 1 };
+    } catch (error) {
+        console.error('Error loading users:', error);
+        return { users: [], nextId: 1 };
+    }
+}
+
+function saveUsers(data) {
+    try {
+        fs.writeFileSync(USERS_DB_FILE, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving users:', error);
+        return false;
+    }
+}
+
+// Authentication middleware
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid or expired token' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
+// Property matching function
+function checkPropertyMatches(property) {
+    const requirementsData = loadRequirements();
+    
+    requirementsData.requirements.forEach(requirement => {
+        if (isPropertyMatch(property, requirement)) {
+            sendMatchNotificationEmail(property, requirement);
+        }
+    });
+}
+
+function isPropertyMatch(property, requirement) {
+    // Check type match
+    if (requirement.type !== 'any' && property.type !== requirement.type) {
+        return false;
+    }
+    
+    // Check price range
+    const propertyPrice = parseFloat(property.price);
+    if (requirement.minPrice && propertyPrice < parseFloat(requirement.minPrice)) {
+        return false;
+    }
+    if (requirement.maxPrice && propertyPrice > parseFloat(requirement.maxPrice)) {
+        return false;
+    }
+    
+    // Check area range
+    const propertyArea = parseInt(property.area);
+    if (requirement.minArea && propertyArea < parseInt(requirement.minArea)) {
+        return false;
+    }
+    if (requirement.maxArea && propertyArea > parseInt(requirement.maxArea)) {
+        return false;
+    }
+    
+    // Check location (partial match)
+    if (requirement.location && requirement.location !== 'any') {
+        const locationMatch = property.location.toLowerCase().includes(requirement.location.toLowerCase());
+        if (!locationMatch) return false;
+    }
+    
+    // Check BHK
+    if (requirement.bhk && requirement.bhk !== 'any') {
+        if (!property.bhk.toLowerCase().includes(requirement.bhk.toLowerCase())) {
+            return false;
+        }
+    }
+    
+    // Check bathrooms
+    if (requirement.bathrooms && requirement.bathrooms !== 'any') {
+        if (property.bathrooms !== requirement.bathrooms) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+async function sendMatchNotificationEmail(property, requirement) {
+    const mailOptions = {
+        from: ADMIN_EMAIL,
+        to: ADMIN_EMAIL,
+        subject: `🏠 Property Match Found!`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #667eea;">🎉 Property Match Alert!</h2>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h3 style="color: #2c3e50;">Matched Property:</h3>
+                    <p><strong>Title:</strong> ${property.title}</p>
+                    <p><strong>Type:</strong> ${property.type}</p>
+                    <p><strong>Price:</strong> ₹${property.price} ${property.type === 'sale' ? 'Cr' : 'Lakh/month'}</p>
+                    <p><strong>Area:</strong> ${property.area} Sq Ft</p>
+                    <p><strong>Location:</strong> ${property.location}</p>
+                    <p><strong>Configuration:</strong> ${property.bhk}</p>
+                    <p><strong>Bathrooms:</strong> ${property.bathrooms || 'N/A'}</p>
+                    <p><strong>Contact:</strong> ${property.contact}</p>
+                </div>
+                
+                <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h3 style="color: #27ae60;">Matched Requirement:</h3>
+                    <p><strong>Client Name:</strong> ${requirement.clientName}</p>
+                    <p><strong>Contact:</strong> ${requirement.clientContact}</p>
+                    <p><strong>Email:</strong> ${requirement.clientEmail}</p>
+                    <p><strong>Type:</strong> ${requirement.type}</p>
+                    <p><strong>Budget:</strong> ₹${requirement.minPrice || '0'} - ₹${requirement.maxPrice || '∞'} ${requirement.type === 'sale' ? 'Cr' : 'Lakh/month'}</p>
+                    <p><strong>Preferred Area:</strong> ${requirement.minArea || '0'} - ${requirement.maxArea || '∞'} Sq Ft</p>
+                    <p><strong>Location:</strong> ${requirement.location || 'Any'}</p>
+                    <p><strong>Configuration:</strong> ${requirement.bhk || 'Any'}</p>
+                </div>
+                
+                <p style="color: #7f8c8d; font-size: 14px;">
+                    This email was automatically generated when a new property matched an existing requirement.
+                </p>
+            </div>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('Match notification email sent successfully');
+    } catch (error) {
+        console.error('Error sending email:', error);
+    }
+}
+
+// Initialize database
 function initializeDatabase() {
     const dbData = loadProperties();
     
@@ -159,42 +336,6 @@ function initializeDatabase() {
             },
             {
                 id: 2,
-                title: "Adarsh Lakefront Bellandur",
-                type: "sale",
-                bhk: "3BHK",
-                bathrooms: "3",
-                area: "2315",
-                price: "4.5",
-                location: "Bellandur Sarjapura Road",
-                facing: "East",
-                furnished: "Ready to move-in",
-                parking: "1 Covered",
-                description: "Ready to move-in, East facing balconies, swimming pool view, Flat on 9th floor, East Balcony, Main door South",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 3,
-                title: "Sobha Royal Pavillion",
-                type: "sale",
-                bhk: "3BHK",
-                bathrooms: "4",
-                area: "1735",
-                price: "3.05",
-                location: "Sarjapur Road",
-                facing: "North",
-                furnished: "Unfurnished",
-                parking: "1 Covered",
-                description: "3BHK + 3 Bathroom + Servant room (with extra Bathroom), 1st Floor, One Balcony, Slightly Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 4,
                 title: "Modern Apartment Koramangala",
                 type: "rent",
                 bhk: "2BHK",
@@ -210,30 +351,12 @@ function initializeDatabase() {
                 videos: [],
                 contact: "9123456789",
                 createdAt: new Date().toISOString()
-            },
-            {
-                id: 5,
-                title: "Luxury Villa Whitefield",
-                type: "sale",
-                bhk: "5BHK",
-                bathrooms: "5",
-                area: "3500",
-                price: "6.75",
-                location: "Whitefield ITPL Road",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "3 Covered",
-                description: "Spacious villa with garden, modern amenities. Perfect for large families.",
-                images: [],
-                videos: [],
-                contact: "9876543210",
-                createdAt: new Date().toISOString()
             }
         ];
 
         const dbData = {
             properties: initialProperties,
-            nextId: 6
+            nextId: 3
         };
 
         saveProperties(dbData);
@@ -249,7 +372,86 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Enhanced search with multiple parameters
+// Authentication routes
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+        
+        const usersData = loadUsers();
+        
+        // Check if user already exists
+        const existingUser = usersData.users.find(user => user.email === email);
+        if (existingUser) {
+            return res.status(400).json({ error: 'User already exists with this email' });
+        }
+        
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        const newUser = {
+            id: usersData.nextId,
+            username,
+            email,
+            password: hashedPassword,
+            createdAt: new Date().toISOString()
+        };
+        
+        usersData.users.push(newUser);
+        usersData.nextId++;
+        
+        if (saveUsers(usersData)) {
+            const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+            res.status(201).json({ 
+                message: 'User registered successfully',
+                token,
+                user: { id: newUser.id, username: newUser.username, email: newUser.email }
+            });
+        } else {
+            res.status(500).json({ error: 'Failed to save user' });
+        }
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+        
+        const usersData = loadUsers();
+        const user = usersData.users.find(u => u.email === email);
+        
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ 
+            message: 'Login successful',
+            token,
+            user: { id: user.id, username: user.username, email: user.email }
+        });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Properties routes
 app.get('/api/properties', (req, res) => {
     try {
         const dbData = loadProperties();
@@ -260,25 +462,20 @@ app.get('/api/properties', (req, res) => {
             location, facing, minArea, maxArea, furnished 
         } = req.query;
         
-        // Text search
+        // Apply filters (same as before)
         if (search) {
             const searchLower = search.toLowerCase();
             filteredProperties = filteredProperties.filter(property => 
                 property.title.toLowerCase().includes(searchLower) ||
                 property.location.toLowerCase().includes(searchLower) ||
-                property.description.toLowerCase().includes(searchLower) ||
-                property.bhk.toLowerCase().includes(searchLower) ||
-                property.furnished.toLowerCase().includes(searchLower) ||
-                property.facing.toLowerCase().includes(searchLower)
+                property.description.toLowerCase().includes(searchLower)
             );
         }
         
-        // Type filter
         if (type && type !== 'all') {
             filteredProperties = filteredProperties.filter(property => property.type === type);
         }
         
-        // Price filters
         if (minPrice) {
             filteredProperties = filteredProperties.filter(property => parseFloat(property.price) >= parseFloat(minPrice));
         }
@@ -286,19 +483,16 @@ app.get('/api/properties', (req, res) => {
             filteredProperties = filteredProperties.filter(property => parseFloat(property.price) <= parseFloat(maxPrice));
         }
         
-        // BHK filter
         if (bhk && bhk !== 'all') {
             filteredProperties = filteredProperties.filter(property => property.bhk.includes(bhk));
         }
         
-        // Bathrooms filter
         if (bathrooms && bathrooms !== 'all') {
             filteredProperties = filteredProperties.filter(property => 
                 property.bathrooms && property.bathrooms.includes(bathrooms)
             );
         }
         
-        // Area filters
         if (minArea) {
             filteredProperties = filteredProperties.filter(property => parseInt(property.area) >= parseInt(minArea));
         }
@@ -306,28 +500,24 @@ app.get('/api/properties', (req, res) => {
             filteredProperties = filteredProperties.filter(property => parseInt(property.area) <= parseInt(maxArea));
         }
         
-        // Location filter
         if (location) {
             filteredProperties = filteredProperties.filter(property => 
                 property.location.toLowerCase().includes(location.toLowerCase())
             );
         }
         
-        // Facing filter
         if (facing && facing !== 'all') {
             filteredProperties = filteredProperties.filter(property => 
                 property.facing.toLowerCase().includes(facing.toLowerCase())
             );
         }
         
-        // Furnished filter
         if (furnished && furnished !== 'all') {
             filteredProperties = filteredProperties.filter(property => 
                 property.furnished.toLowerCase().includes(furnished.toLowerCase())
             );
         }
         
-        // Sort by newest first
         filteredProperties.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         
         res.json(filteredProperties);
@@ -337,7 +527,6 @@ app.get('/api/properties', (req, res) => {
     }
 });
 
-// Get single property
 app.get('/api/properties/:id', (req, res) => {
     try {
         const dbData = loadProperties();
@@ -352,8 +541,7 @@ app.get('/api/properties/:id', (req, res) => {
     }
 });
 
-// Add new property with enhanced fields
-app.post('/api/properties', upload.fields([
+app.post('/api/properties', authenticateToken, upload.fields([
     { name: 'images', maxCount: 10 },
     { name: 'videos', maxCount: 5 }
 ]), (req, res) => {
@@ -370,20 +558,8 @@ app.post('/api/properties', upload.fields([
         
         const newProperty = {
             id: dbData.nextId,
-            title,
-            type,
-            bhk,
-            bathrooms: bathrooms || "1",
-            area,
-            price,
-            location,
-            facing,
-            furnished,
-            parking,
-            description,
-            contact,
-            images,
-            videos,
+            title, type, bhk, bathrooms: bathrooms || "1", area, price, location, facing,
+            furnished, parking, description, contact, images, videos,
             createdAt: new Date().toISOString()
         };
         
@@ -391,6 +567,8 @@ app.post('/api/properties', upload.fields([
         dbData.nextId++;
         
         if (saveProperties(dbData)) {
+            // Check for matches with existing requirements
+            checkPropertyMatches(newProperty);
             res.status(201).json(newProperty);
         } else {
             res.status(500).json({ error: 'Failed to save property' });
@@ -401,8 +579,137 @@ app.post('/api/properties', upload.fields([
     }
 });
 
-// Media upload endpoint
-app.post('/api/upload-media', mediaUpload.array('media', 20), (req, res) => {
+app.put('/api/properties/:id', authenticateToken, upload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'videos', maxCount: 5 }
+]), (req, res) => {
+    try {
+        const dbData = loadProperties();
+        const propertyIndex = dbData.properties.findIndex(p => p.id === parseInt(req.params.id));
+        
+        if (propertyIndex === -1) {
+            return res.status(404).json({ error: 'Property not found' });
+        }
+        
+        const {
+            title, type, bhk, bathrooms, area, price, location, facing, 
+            furnished, parking, description, contact
+        } = req.body;
+        
+        const existingProperty = dbData.properties[propertyIndex];
+        const images = req.files?.images?.map(file => `/uploads/${file.filename}`) || existingProperty.images;
+        const videos = req.files?.videos?.map(file => `/uploads/${file.filename}`) || existingProperty.videos;
+        
+        const updatedProperty = {
+            ...existingProperty,
+            title, type, bhk, bathrooms: bathrooms || existingProperty.bathrooms, 
+            area, price, location, facing, furnished, parking, description, contact,
+            images, videos, updatedAt: new Date().toISOString()
+        };
+        
+        dbData.properties[propertyIndex] = updatedProperty;
+        
+        if (saveProperties(dbData)) {
+            res.json(updatedProperty);
+        } else {
+            res.status(500).json({ error: 'Failed to update property' });
+        }
+    } catch (error) {
+        console.error('Error updating property:', error);
+        res.status(500).json({ error: 'Failed to update property' });
+    }
+});
+
+app.delete('/api/properties/:id', authenticateToken, (req, res) => {
+    try {
+        const dbData = loadProperties();
+        const propertyIndex = dbData.properties.findIndex(p => p.id === parseInt(req.params.id));
+        
+        if (propertyIndex === -1) {
+            return res.status(404).json({ error: 'Property not found' });
+        }
+        
+        const property = dbData.properties[propertyIndex];
+        
+        // Delete associated files
+        [...property.images, ...property.videos].forEach(filePath => {
+            const fullPath = path.join(__dirname, filePath);
+            if (fs.existsSync(fullPath)) {
+                try {
+                    fs.unlinkSync(fullPath);
+                } catch (fileError) {
+                    console.error('Error deleting file:', fullPath, fileError);
+                }
+            }
+        });
+        
+        dbData.properties.splice(propertyIndex, 1);
+        
+        if (saveProperties(dbData)) {
+            res.json({ message: 'Property deleted successfully' });
+        } else {
+            res.status(500).json({ error: 'Failed to delete property' });
+        }
+    } catch (error) {
+        console.error('Error deleting property:', error);
+        res.status(500).json({ error: 'Failed to delete property' });
+    }
+});
+
+// Requirements routes
+app.get('/api/requirements', (req, res) => {
+    try {
+        const requirementsData = loadRequirements();
+        res.json(requirementsData.requirements);
+    } catch (error) {
+        console.error('Error getting requirements:', error);
+        res.status(500).json({ error: 'Failed to load requirements' });
+    }
+});
+
+app.post('/api/requirements', (req, res) => {
+    try {
+        const {
+            clientName, clientEmail, clientContact, type, minPrice, maxPrice,
+            minArea, maxArea, location, bhk, bathrooms, furnished, additionalRequirements
+        } = req.body;
+        
+        const requirementsData = loadRequirements();
+        
+        const newRequirement = {
+            id: requirementsData.nextId,
+            clientName, clientEmail, clientContact, type, minPrice, maxPrice,
+            minArea, maxArea, location, bhk, bathrooms, furnished, additionalRequirements,
+            createdAt: new Date().toISOString()
+        };
+        
+        requirementsData.requirements.push(newRequirement);
+        requirementsData.nextId++;
+        
+        if (saveRequirements(requirementsData)) {
+            // Check existing properties for matches
+            const propertiesData = loadProperties();
+            propertiesData.properties.forEach(property => {
+                if (isPropertyMatch(property, newRequirement)) {
+                    sendMatchNotificationEmail(property, newRequirement);
+                }
+            });
+            
+            res.status(201).json({ 
+                message: 'Requirement submitted successfully',
+                requirement: newRequirement 
+            });
+        } else {
+            res.status(500).json({ error: 'Failed to save requirement' });
+        }
+    } catch (error) {
+        console.error('Error adding requirement:', error);
+        res.status(500).json({ error: 'Failed to add requirement' });
+    }
+});
+
+// Media upload
+app.post('/api/upload-media', authenticateToken, mediaUpload.array('media', 20), (req, res) => {
     try {
         const { bucket, title, description } = req.body;
         const files = req.files || [];
@@ -442,7 +749,6 @@ app.post('/api/upload-media', mediaUpload.array('media', 20), (req, res) => {
     }
 });
 
-// Get media files
 app.get('/api/media', (req, res) => {
     try {
         const { bucket } = req.query;
@@ -460,45 +766,7 @@ app.get('/api/media', (req, res) => {
     }
 });
 
-// Delete property
-app.delete('/api/properties/:id', (req, res) => {
-    try {
-        const dbData = loadProperties();
-        const propertyIndex = dbData.properties.findIndex(p => p.id === parseInt(req.params.id));
-        
-        if (propertyIndex === -1) {
-            return res.status(404).json({ error: 'Property not found' });
-        }
-        
-        const property = dbData.properties[propertyIndex];
-        
-        // Delete associated files
-        [...property.images, ...property.videos].forEach(filePath => {
-            const fullPath = path.join(__dirname, filePath);
-            if (fs.existsSync(fullPath)) {
-                try {
-                    fs.unlinkSync(fullPath);
-                } catch (fileError) {
-                    console.error('Error deleting file:', fullPath, fileError);
-                }
-            }
-        });
-        
-        // Remove property from database
-        dbData.properties.splice(propertyIndex, 1);
-        
-        if (saveProperties(dbData)) {
-            res.json({ message: 'Property deleted successfully' });
-        } else {
-            res.status(500).json({ error: 'Failed to delete property' });
-        }
-    } catch (error) {
-        console.error('Error deleting property:', error);
-        res.status(500).json({ error: 'Failed to delete property' });
-    }
-});
-
-// Enhanced share with search filters
+// Share property
 app.get('/api/share/:id', (req, res) => {
     try {
         const dbData = loadProperties();
@@ -520,23 +788,24 @@ app.get('/property/:id', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'property.html'));
 });
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
         propertiesCount: loadProperties().properties.length,
+        requirementsCount: loadRequirements().requirements.length,
         mediaCount: loadMedia().media.length
     });
 });
 
 // Initialize database on startup
-const dbData = initializeDatabase();
+initializeDatabase();
 
 app.listen(PORT, () => {
     console.log(`🚀 Enhanced Property Listing Server running on port ${PORT}`);
-    console.log(`📊 Loaded ${loadProperties().properties.length} properties from database`);
+    console.log(`📊 Loaded ${loadProperties().properties.length} properties`);
+    console.log(`📋 Loaded ${loadRequirements().requirements.length} requirements`);
     console.log(`📁 Media storage buckets created: bucket1, bucket2, bucket3`);
-    console.log(`💾 Database file: ${DB_FILE}`);
-    console.log(`📸 Media database: ${MEDIA_DB_FILE}`);
+    console.log(`💾 Database files initialized`);
 });
