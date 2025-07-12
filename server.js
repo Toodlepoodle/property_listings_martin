@@ -12,24 +12,37 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
+app.use('/media', express.static('media')); // New media folder
 app.use(express.static('public'));
 
 // Create necessary directories
-if (!fs.existsSync('uploads')) {
-    fs.mkdirSync('uploads', { recursive: true });
-}
+const directories = ['uploads', 'data', 'media', 'media/bucket1', 'media/bucket2', 'media/bucket3'];
+directories.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
 
-if (!fs.existsSync('data')) {
-    fs.mkdirSync('data', { recursive: true });
-}
-
-// Database file path
+// Database file paths
 const DB_FILE = path.join(__dirname, 'data', 'properties.json');
+const MEDIA_DB_FILE = path.join(__dirname, 'data', 'media.json');
 
-// Configure multer for file uploads
+// Configure multer for property uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// Configure multer for media bucket uploads
+const mediaStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const bucket = req.body.bucket || 'bucket1';
+        cb(null, `media/${bucket}/`);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -51,6 +64,24 @@ const upload = multer({
             return cb(null, true);
         } else {
             cb('Error: Only images, videos, and PDFs allowed!');
+        }
+    }
+});
+
+const mediaUpload = multer({ 
+    storage: mediaStorage,
+    limits: {
+        fileSize: 100 * 1024 * 1024 // 100MB limit for media
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|webm|mkv/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb('Error: Only images and videos allowed!');
         }
     }
 });
@@ -79,7 +110,30 @@ function saveProperties(data) {
     }
 }
 
-// Initialize database with sample properties if it doesn't exist
+function loadMedia() {
+    try {
+        if (fs.existsSync(MEDIA_DB_FILE)) {
+            const data = fs.readFileSync(MEDIA_DB_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+        return { media: [], nextId: 1 };
+    } catch (error) {
+        console.error('Error loading media:', error);
+        return { media: [], nextId: 1 };
+    }
+}
+
+function saveMedia(data) {
+    try {
+        fs.writeFileSync(MEDIA_DB_FILE, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving media:', error);
+        return false;
+    }
+}
+
+// Initialize database with enhanced sample properties
 function initializeDatabase() {
     const dbData = loadProperties();
     
@@ -90,6 +144,7 @@ function initializeDatabase() {
                 title: "IDEB Springfield Penthouse",
                 type: "sale",
                 bhk: "4BHK",
+                bathrooms: "4",
                 area: "2554",
                 price: "3.45",
                 location: "Sarjapur Road",
@@ -106,7 +161,8 @@ function initializeDatabase() {
                 id: 2,
                 title: "Adarsh Lakefront Bellandur",
                 type: "sale",
-                bhk: "3.5BHK",
+                bhk: "3BHK",
+                bathrooms: "3",
                 area: "2315",
                 price: "4.5",
                 location: "Bellandur Sarjapura Road",
@@ -124,6 +180,7 @@ function initializeDatabase() {
                 title: "Sobha Royal Pavillion",
                 type: "sale",
                 bhk: "3BHK",
+                bathrooms: "4",
                 area: "1735",
                 price: "3.05",
                 location: "Sarjapur Road",
@@ -138,468 +195,45 @@ function initializeDatabase() {
             },
             {
                 id: 4,
-                title: "DSR Wood Winds",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1840",
-                price: "2.15",
-                location: "Sarjapur Road",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "2 Covered",
-                description: "West facing door and East facing Balcony, Semi furnished, Keys available for immediate visit, Non negotiable",
+                title: "Modern Apartment Koramangala",
+                type: "rent",
+                bhk: "2BHK",
+                bathrooms: "2",
+                area: "1200",
+                price: "0.45",
+                location: "Koramangala 4th Block",
+                facing: "North",
+                furnished: "Fully Furnished",
+                parking: "1 Covered",
+                description: "Fully furnished 2BHK in prime Koramangala location. Near metro, restaurants, and IT parks.",
                 images: [],
                 videos: [],
-                contact: "9902925519",
+                contact: "9123456789",
                 createdAt: new Date().toISOString()
             },
             {
                 id: 5,
-                title: "Sobha Sentosa Rental",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1804",
-                price: "0.72",
-                location: "Sarjapur Road",
+                title: "Luxury Villa Whitefield",
+                type: "sale",
+                bhk: "5BHK",
+                bathrooms: "5",
+                area: "3500",
+                price: "6.75",
+                location: "Whitefield ITPL Road",
                 facing: "East",
                 furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, 3Balconies, Rent 72K Plus maintenance, Deposit 4 to 5 months, Ready to move, Only family, Middle Floor",
+                parking: "3 Covered",
+                description: "Spacious villa with garden, modern amenities. Perfect for large families.",
                 images: [],
                 videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 6,
-                title: "Banyan Tree Rental",
-                type: "rent",
-                bhk: "3BHK",
-                area: "2410",
-                price: "0.75",
-                location: "Sarjapur Road",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 4Bath, 3Balconies, Carpet Area 2410, Rent 75K Plus maintenance, Deposit 3Lac, Available July 30th, Only family",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 7,
-                title: "Purva Skywood",
-                type: "rent",
-                bhk: "2BHK",
-                area: "1200",
-                price: "0.60",
-                location: "Sarjapur Road",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2 BHK, 2 Bath, 1 Balcony, Rent: 60k including maintenance, Deposit: 3 Lacs, Available From 22nd June",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 8,
-                title: "Sobha Royal Pavilion Rental",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1560",
-                price: "0.75",
-                location: "Sarjapur Road",
-                facing: "East",
-                furnished: "Fully Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, 1Balcony, Fully furnished, Rent 75K, Maintenance 5K, Deposit 4.5Lac, Higher floor, Carpet 1200",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 9,
-                title: "Prestige Kew Gardens",
-                type: "rent",
-                bhk: "2BHK",
-                area: "1300",
-                price: "0.60",
-                location: "Whitefield",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, 1Balcony, Rent 60K, Maintenance 5.5K, Deposit 3Lac, Family and Female bachelors, Available July 1st",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 10,
-                title: "Pranavas BSR Gtaaar",
-                type: "rent",
-                bhk: "2BHK",
-                area: "1200",
-                price: "0.55",
-                location: "Sarjapur Road",
-                facing: "North",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, Rent 55K, Maintenance 3K, Deposit 1.5Lac, Available July 1st, Family and bachelors both welcome",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 11,
-                title: "Salarpuria Sattva Greenage",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1800",
-                price: "0.85",
-                location: "Whitefield",
-                facing: "North",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, Rent 85K Plus maintenance, Deposit 3Lac, Higher floor, Only family, Ready to move",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 12,
-                title: "SJR Palaza City",
-                type: "rent",
-                bhk: "3.5BHK",
-                area: "1900",
-                price: "0.65",
-                location: "Whitefield",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3.5Bhk, 3Bath, Rent 65K, Maintenance 6.5K, Deposit 2.5Lac, Higher floor, Family and bachelors both welcome",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 13,
-                title: "Silver Country Apartment",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1650",
-                price: "0.48",
-                location: "Electronic City",
-                facing: "South",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, 2Balconies, Rent 48K negotiable, Maintenance 3.7K, Deposit 2Lac, Available June 30th, Only family",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 14,
-                title: "Ozone Residenza",
-                type: "rent",
-                bhk: "3BHK",
-                area: "2200",
-                price: "1.50",
-                location: "Whitefield",
-                facing: "North",
-                furnished: "Fully Furnished",
-                parking: "2 Covered",
-                description: "3Bhk, 4Bath, 3Balconies, With Study Room, Rent 1.5Lac Plus maintenance, Deposit 6Months, Ground floor, Family and Female bachelors",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 15,
-                title: "Sobha Garnet",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1750",
-                price: "0.75",
-                location: "Sarjapur Road",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, Ground floor, Rent 75K Including maintenance, Deposit 5Months, Family and bachelors both welcome",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 16,
-                title: "SNN Raj Eternia",
-                type: "rent",
-                bhk: "3BHK",
-                area: "1680",
-                price: "0.70",
-                location: "Whitefield",
-                facing: "North",
-                furnished: "Fully Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 2Bath, 2Balconies, Rent 70k, Maintenance 5 to 6K, Deposit 3Lac, Higher floor, Available July 1st, Only family",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 17,
-                title: "Vaishnavi Orchids Villament Duplex - 1",
-                type: "sale",
-                bhk: "3BHK",
-                area: "3150",
-                price: "3.28",
-                location: "Whitefield",
-                facing: "South",
-                furnished: "Semi Furnished",
-                parking: "2 Covered",
-                description: "Duplex villa, Ground & 1st Floor, South Facing Main Door, 3bhk, 3bath, 3150 Sq ft, Negotiable price",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 18,
-                title: "Vaishnavi Orchids Villament Duplex - 2",
-                type: "sale",
-                bhk: "3BHK",
-                area: "3100",
-                price: "2.95",
-                location: "Whitefield",
-                facing: "South",
-                furnished: "Semi Furnished",
-                parking: "2 Covered",
-                description: "Duplex villa, Ground & 1st Floor, South Facing Main Door & West Facing, 3bhk, 3bath, 3100 Sq ft, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 19,
-                title: "Vaishnavi Orchids Villament Duplex - 3",
-                type: "sale",
-                bhk: "3BHK",
-                area: "3250",
-                price: "3.58",
-                location: "Whitefield",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "2 Covered",
-                description: "Duplex villa, 2nd & 3rd Floor with Terrace, East Facing Main Door, 3bhk, 3bath, 3250 Sq ft, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 20,
-                title: "Prestige Ferns Residency (PFR)",
-                type: "sale",
-                bhk: "2BHK",
-                area: "1197",
-                price: "1.89",
-                location: "Whitefield",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, 1197 Sq ft, 13th floor, West Facing, Semi Furnished, One Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 21,
-                title: "Bhuvana Greens Apartment",
-                type: "sale",
-                bhk: "2BHK",
-                area: "1250",
-                price: "1.32",
-                location: "Electronic City",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, 1250 Sq ft, 7th floor, East Facing Main Door, West facing Balcony, One Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 22,
-                title: "Mana Jardin Apartment",
-                type: "sale",
-                bhk: "2BHK",
-                area: "1241",
-                price: "1.10",
-                location: "Doddakanahalli",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, 1241 Sq feet, West facing Main Door, Ground floor, One Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 23,
-                title: "Purva Sunshine Apartment",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1757",
-                price: "2.20",
-                location: "Electronic City",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, Semi furnished, 1757 Sq ft, 6th floor, West Facing, One Covered car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 24,
-                title: "Bren Zahara Apartment - Brand New",
-                type: "sale",
-                bhk: "1BHK",
-                area: "495",
-                price: "0.56",
-                location: "Electronic City",
-                facing: "South",
-                furnished: "Unfurnished",
-                parking: "1 Covered",
-                description: "Brand New Flat, 1Bhk, 1 Bath, 495 Sq ft, South Facing, 1st floor, Unfurnished, One Covered Car Parking",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 25,
-                title: "Sharanya Arcade Apartment",
-                type: "sale",
-                bhk: "2BHK",
-                area: "1121",
-                price: "0.65",
-                location: "Whitefield",
-                facing: "West",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2 Bhk, 2 bath, 1121 Sq ft, West Facing Main Door, 2nd floor, Semi Furnished, Basic Apt with Power Back Up, Lift, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9019040620",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 26,
-                title: "Bren Imperia Apartment",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1779",
-                price: "3.39",
-                location: "Whitefield",
-                facing: "North",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, 1779Sq ft, North Facing Main Door, Semi Furnished, 1st Floor, One Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 27,
-                title: "Kumar I Life Apartment",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1830",
-                price: "2.80",
-                location: "Whitefield",
-                facing: "North",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3Bhk, 3Bath, 1830Sq ft, Semi Furnished, North Facing, 6th Floor, One Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 28,
-                title: "Bren Celestia Apartment",
-                type: "sale",
-                bhk: "2BHK",
-                area: "1350",
-                price: "1.55",
-                location: "Whitefield",
-                facing: "East",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "2Bhk, 2Bath, 1350 Sq ft, Semi Furnished, East Facing, 5th floor, one Covered Car Parking, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 29,
-                title: "Sobha Manhattan Towers",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1755",
-                price: "2.30",
-                location: "Hosur Main Road",
-                facing: "South",
-                furnished: "Semi Furnished",
-                parking: "1 Covered",
-                description: "3BHK, SBUA 1755 Sqft, 38th floor (Top most floor), 2 Balconies, Tower-1, Possession 2026 December End, No National Highway",
-                images: [],
-                videos: [],
-                contact: "9902925519",
-                createdAt: new Date().toISOString()
-            },
-            {
-                id: 30,
-                title: "DLF Westend Heights",
-                type: "sale",
-                bhk: "3BHK",
-                area: "1570",
-                price: "1.72",
-                location: "Akshayanagar",
-                facing: "South",
-                furnished: "Unfurnished",
-                parking: "1 Covered",
-                description: "3BHK Unfinished brand New flat Never Occupied, 3 Bathroom, 3 Balcony, Utility-1, 11th Floor out of 18 Floors, Main Door South East, A Khata, 8 years old, Negotiable",
-                images: [],
-                videos: [],
-                contact: "9902925519",
+                contact: "9876543210",
                 createdAt: new Date().toISOString()
             }
         ];
 
         const dbData = {
             properties: initialProperties,
-            nextId: 31
+            nextId: 6
         };
 
         saveProperties(dbData);
@@ -610,22 +244,23 @@ function initializeDatabase() {
     return dbData;
 }
 
-// Initialize database on startup
-const dbData = initializeDatabase();
-
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Get all properties with search and filters
+// Enhanced search with multiple parameters
 app.get('/api/properties', (req, res) => {
     try {
         const dbData = loadProperties();
         let filteredProperties = [...dbData.properties];
         
-        const { search, type, minPrice, maxPrice, bhk, location, facing } = req.query;
+        const { 
+            search, type, minPrice, maxPrice, bhk, bathrooms, 
+            location, facing, minArea, maxArea, furnished 
+        } = req.query;
         
+        // Text search
         if (search) {
             const searchLower = search.toLowerCase();
             filteredProperties = filteredProperties.filter(property => 
@@ -638,31 +273,57 @@ app.get('/api/properties', (req, res) => {
             );
         }
         
+        // Type filter
         if (type && type !== 'all') {
             filteredProperties = filteredProperties.filter(property => property.type === type);
         }
         
+        // Price filters
         if (minPrice) {
             filteredProperties = filteredProperties.filter(property => parseFloat(property.price) >= parseFloat(minPrice));
         }
-        
         if (maxPrice) {
             filteredProperties = filteredProperties.filter(property => parseFloat(property.price) <= parseFloat(maxPrice));
         }
         
+        // BHK filter
         if (bhk && bhk !== 'all') {
             filteredProperties = filteredProperties.filter(property => property.bhk.includes(bhk));
         }
         
+        // Bathrooms filter
+        if (bathrooms && bathrooms !== 'all') {
+            filteredProperties = filteredProperties.filter(property => 
+                property.bathrooms && property.bathrooms.includes(bathrooms)
+            );
+        }
+        
+        // Area filters
+        if (minArea) {
+            filteredProperties = filteredProperties.filter(property => parseInt(property.area) >= parseInt(minArea));
+        }
+        if (maxArea) {
+            filteredProperties = filteredProperties.filter(property => parseInt(property.area) <= parseInt(maxArea));
+        }
+        
+        // Location filter
         if (location) {
             filteredProperties = filteredProperties.filter(property => 
                 property.location.toLowerCase().includes(location.toLowerCase())
             );
         }
         
+        // Facing filter
         if (facing && facing !== 'all') {
             filteredProperties = filteredProperties.filter(property => 
                 property.facing.toLowerCase().includes(facing.toLowerCase())
+            );
+        }
+        
+        // Furnished filter
+        if (furnished && furnished !== 'all') {
+            filteredProperties = filteredProperties.filter(property => 
+                property.furnished.toLowerCase().includes(furnished.toLowerCase())
             );
         }
         
@@ -691,14 +352,14 @@ app.get('/api/properties/:id', (req, res) => {
     }
 });
 
-// Add new property
+// Add new property with enhanced fields
 app.post('/api/properties', upload.fields([
     { name: 'images', maxCount: 10 },
     { name: 'videos', maxCount: 5 }
 ]), (req, res) => {
     try {
         const {
-            title, type, bhk, area, price, location, facing, 
+            title, type, bhk, bathrooms, area, price, location, facing, 
             furnished, parking, description, contact
         } = req.body;
         
@@ -712,6 +373,7 @@ app.post('/api/properties', upload.fields([
             title,
             type,
             bhk,
+            bathrooms: bathrooms || "1",
             area,
             price,
             location,
@@ -736,6 +398,65 @@ app.post('/api/properties', upload.fields([
     } catch (error) {
         console.error('Error adding property:', error);
         res.status(500).json({ error: 'Failed to add property' });
+    }
+});
+
+// Media upload endpoint
+app.post('/api/upload-media', mediaUpload.array('media', 20), (req, res) => {
+    try {
+        const { bucket, title, description } = req.body;
+        const files = req.files || [];
+        
+        if (files.length === 0) {
+            return res.status(400).json({ error: 'No files uploaded' });
+        }
+        
+        const mediaData = loadMedia();
+        
+        const uploadedFiles = files.map(file => ({
+            id: mediaData.nextId++,
+            originalName: file.originalname,
+            filename: file.filename,
+            path: `/media/${bucket}/${file.filename}`,
+            size: file.size,
+            mimetype: file.mimetype,
+            bucket: bucket || 'bucket1',
+            title: title || file.originalname,
+            description: description || '',
+            uploadedAt: new Date().toISOString()
+        }));
+        
+        mediaData.media.push(...uploadedFiles);
+        
+        if (saveMedia(mediaData)) {
+            res.status(201).json({
+                message: 'Files uploaded successfully',
+                files: uploadedFiles
+            });
+        } else {
+            res.status(500).json({ error: 'Failed to save media data' });
+        }
+    } catch (error) {
+        console.error('Error uploading media:', error);
+        res.status(500).json({ error: 'Failed to upload media' });
+    }
+});
+
+// Get media files
+app.get('/api/media', (req, res) => {
+    try {
+        const { bucket } = req.query;
+        const mediaData = loadMedia();
+        
+        let files = mediaData.media;
+        if (bucket && bucket !== 'all') {
+            files = files.filter(file => file.bucket === bucket);
+        }
+        
+        res.json(files);
+    } catch (error) {
+        console.error('Error getting media:', error);
+        res.status(500).json({ error: 'Failed to load media' });
     }
 });
 
@@ -777,7 +498,7 @@ app.delete('/api/properties/:id', (req, res) => {
     }
 });
 
-// Generate shareable link
+// Enhanced share with search filters
 app.get('/api/share/:id', (req, res) => {
     try {
         const dbData = loadProperties();
@@ -804,12 +525,18 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        propertiesCount: loadProperties().properties.length
+        propertiesCount: loadProperties().properties.length,
+        mediaCount: loadMedia().media.length
     });
 });
 
+// Initialize database on startup
+const dbData = initializeDatabase();
+
 app.listen(PORT, () => {
-    console.log(`🚀 Property Listing Server running on port ${PORT}`);
+    console.log(`🚀 Enhanced Property Listing Server running on port ${PORT}`);
     console.log(`📊 Loaded ${loadProperties().properties.length} properties from database`);
+    console.log(`📁 Media storage buckets created: bucket1, bucket2, bucket3`);
     console.log(`💾 Database file: ${DB_FILE}`);
+    console.log(`📸 Media database: ${MEDIA_DB_FILE}`);
 });
