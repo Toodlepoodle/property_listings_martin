@@ -1,12 +1,11 @@
 {
-  "name": "property-listing-website",
-  "version": "1.0.0",
-  "description": "Professional property listing website with requirements matching, authentication, and email notifications",
+  "name": "property-listing-otp-website",
+  "version": "2.0.0",
+  "description": "Property listing website with OTP-based authentication for users to upload properties and requirements",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "build": "echo 'No build step required'"
+    "dev": "nodemon server.js"
   },
   "keywords": [
     "real estate", 
@@ -14,20 +13,18 @@
     "listing", 
     "nodejs", 
     "express", 
-    "requirements", 
-    "authentication",
-    "email notifications",
-    "property management"
+    "otp authentication",
+    "email verification",
+    "property management",
+    "requirements matching"
   ],
-  "author": "Real Estate Agent",
+  "author": "Real Estate Portal",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "multer": "^1.4.5-lts.1",
     "cors": "^2.8.5",
-    "nodemailer": "^6.9.7",
-    "bcrypt": "^5.1.1",
-    "jsonwebtoken": "^9.0.2"
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
@@ -35,13 +32,5 @@
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "your-repository-url"
-  },
-  "bugs": {
-    "url": "your-repository-url/issues"
-  },
-  "homepage": "your-repository-url#readme"
+  }
 }

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Requirements - Property Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(79, 172, 254, 0.6);
+        }
+
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .form-container {
+                padding: 25px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Properties
+        </a>
+
+        <div class="header">
+            <h1><i class="fas fa-clipboard-list"></i> Upload Property Requirements</h1>
+            <p>Tell us what you're looking for and we'll help you find the perfect property!</p>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            <i class="fas fa-user"></i>
+            <span>Loading user information...</span>
+        </div>
+
+        <div class="form-container">
+            <form id="requirementsForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="clientName"><i class="fas fa-user"></i> Your Name</label>
+                        <input type="text" id="clientName" name="clientName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientEmail"><i class="fas fa-envelope"></i> Email Address</label>
+                        <input type="email" id="clientEmail" name="clientEmail" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientContact"><i class="fas fa-phone"></i> Contact Number</label>
+                        <input type="tel" id="clientContact" name="clientContact" required placeholder="10-digit mobile number">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqType"><i class="fas fa-handshake"></i> Looking For</label>
+                        <select id="reqType" name="type" required>
+                            <option value="">Select Option</option>
+                            <option value="sale">Property to Buy</option>
+                            <option value="rent">Property to Rent</option>
+                            <option value="any">Both Buy & Rent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqBhk"><i class="fas fa-bed"></i> Preferred BHK</label>
+                        <select id="reqBhk" name="bhk">
+                            <option value="any">Any Configuration</option>
+                            <option value="1">1 BHK</option>
+                            <option value="2">2 BHK</option>
+                            <option value="3">3 BHK</option>
+                            <option value="4">4 BHK</option>
+                            <option value="5">5+ BHK</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reqBathrooms"><i class="fas fa-bath"></i> Preferred Bathrooms</label>
+                        <select id="reqBathrooms" name="bathrooms">
+                            <option value="any">Any Number</option>
+                            <option value="1">1 Bathroom</option>
+                            <option value="2">2 Bathrooms</option>
+                            <option value="3">3 Bathrooms</option>
+                            <option value="4">4+ Bathrooms</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqMinPrice"><i class="fas fa-rupee-sign"></i> Minimum Budget (Crores)</label>
+                        <input type="number" id="reqMinPrice" name="minPrice" step="0.1" min="0" placeholder="Enter minimum budget">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqMaxPrice"><i class="fas fa-rupee-sign"></i> Maximum Budget (Crores)</label>
+                        <input type="number" id="reqMaxPrice" name="maxPrice" step="0.1" min="0" placeholder="Enter maximum budget">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reqMinArea"><i class="fas fa-expand-arrows-alt"></i> Minimum Area (Sq Ft)</label>
+                        <input type="number" id="reqMinArea" name="minArea" min="0" placeholder="Enter minimum area">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqMaxArea"><i class="fas fa-expand-arrows-alt"></i> Maximum Area (Sq Ft)</label>
+                        <input type="number" id="reqMaxArea" name="maxArea" min="0" placeholder="Enter maximum area">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reqLocation"><i class="fas fa-map-marker-alt"></i> Preferred Location</label>
+                        <input type="text" id="reqLocation" name="location" placeholder="Enter preferred area/location">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reqFurnished"><i class="fas fa-couch"></i> Furnished Preference</label>
+                        <select id="reqFurnished" name="furnished">
+                            <option value="any">Any Type</option>
+                            <option value="unfurnished">Unfurnished</option>
+                            <option value="semi">Semi Furnished</option>
+                            <option value="fully">Fully Furnished</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="additionalRequirements"><i class="fas fa-align-left"></i> Additional Requirements</label>
+                    <textarea id="additionalRequirements" name="additionalRequirements" rows="4" placeholder="Any specific requirements like parking, amenities, floor preference, etc."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Submit Requirements
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('userData');
+        
+        if (!token || !userData) {
+            alert('Please login first to upload requirements');
+            window.location.href = '/';
+        }
+
+        const currentUser = JSON.parse(userData);
+        
+        // Display user info
+        document.getElementById('userInfo').innerHTML = `
+            <i class="fas fa-user"></i>
+            Welcome, ${currentUser.name}! (${currentUser.identifier})
+        `;
+
+        // Pre-fill form with user data
+        document.getElementById('clientName').value = currentUser.name;
+        if (currentUser.identifier.includes('@')) {
+            document.getElementById('clientEmail').value = currentUser.identifier;
+        } else {
+            document.getElementById('clientContact').value = currentUser.identifier;
+        }
+
+        // Form submission
+        document.getElementById('requirementsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            submitBtn.disabled = true;
+            
+            const requirementData = {
+                clientName: formData.get('clientName'),
+                clientEmail: formData.get('clientEmail'),
+                clientContact: formData.get('clientContact'),
+                type: formData.get('type'),
+                bhk: formData.get('bhk'),
+                bathrooms: formData.get('bathrooms'),
+                minPrice: formData.get('minPrice'),
+                maxPrice: formData.get('maxPrice'),
+                minArea: formData.get('minArea'),
+                maxArea: formData.get('maxArea'),
+                location: formData.get('location'),
+                furnished: formData.get('furnished'),
+                additionalRequirements: formData.get('additionalRequirements')
+            };
+            
+            try {
+                const response = await fetch('/api/requirements', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(requirementData)
+                });
+                
+                if (response.ok) {
+                    alert('Requirements submitted successfully! We\'ll notify you when matching properties are available.');
+                    window.location.href = '/';
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.error}`);
+                }
+            } catch (error) {
+                console.error('Error submitting requirements:', error);
+                alert('Error submitting requirements. Please try again.');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

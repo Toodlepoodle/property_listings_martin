@@ -4,20 +4,17 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'adiiroy67@gmail.com';
 const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD || 'ggji sbkc bufx iyqa';
 
 // Email configuration
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // or your email service
+    service: 'gmail',
     auth: {
         user: ADMIN_EMAIL,
         pass: EMAIL_PASSWORD
@@ -42,26 +39,14 @@ directories.forEach(dir => {
 
 // Database file paths
 const DB_FILE = path.join(__dirname, 'data', 'properties.json');
-const MEDIA_DB_FILE = path.join(__dirname, 'data', 'media.json');
-const REQUIREMENTS_DB_FILE = path.join(__dirname, 'data', 'requirements.json');
 const USERS_DB_FILE = path.join(__dirname, 'data', 'users.json');
+const REQUIREMENTS_DB_FILE = path.join(__dirname, 'data', 'requirements.json');
+const OTP_DB_FILE = path.join(__dirname, 'data', 'otps.json');
 
-// Configure multer for property uploads
+// Configure multer for uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-// Configure multer for media bucket uploads
-const mediaStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const bucket = req.body.bucket || 'bucket1';
-        cb(null, `media/${bucket}/`);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -78,18 +63,6 @@ const upload = multer({
         const mimetype = allowedTypes.test(file.mimetype);
         if (mimetype && extname) return cb(null, true);
         cb('Error: Only images, videos, and PDFs allowed!');
-    }
-});
-
-const mediaUpload = multer({ 
-    storage: mediaStorage,
-    limits: { fileSize: 100 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|webm|mkv/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-        if (mimetype && extname) return cb(null, true);
-        cb('Error: Only images and videos allowed!');
     }
 });
 
@@ -117,25 +90,25 @@ function saveProperties(data) {
     }
 }
 
-function loadMedia() {
+function loadUsers() {
     try {
-        if (fs.existsSync(MEDIA_DB_FILE)) {
-            const data = fs.readFileSync(MEDIA_DB_FILE, 'utf8');
+        if (fs.existsSync(USERS_DB_FILE)) {
+            const data = fs.readFileSync(USERS_DB_FILE, 'utf8');
             return JSON.parse(data);
         }
-        return { media: [], nextId: 1 };
+        return { users: [], nextId: 1 };
     } catch (error) {
-        console.error('Error loading media:', error);
-        return { media: [], nextId: 1 };
+        console.error('Error loading users:', error);
+        return { users: [], nextId: 1 };
     }
 }
 
-function saveMedia(data) {
+function saveUsers(data) {
     try {
-        fs.writeFileSync(MEDIA_DB_FILE, JSON.stringify(data, null, 2));
+        fs.writeFileSync(USERS_DB_FILE, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {
-        console.error('Error saving media:', error);
+        console.error('Error saving users:', error);
         return false;
     }
 }
@@ -163,150 +136,119 @@ function saveRequirements(data) {
     }
 }
 
-function loadUsers() {
+function loadOTPs() {
     try {
-        if (fs.existsSync(USERS_DB_FILE)) {
-            const data = fs.readFileSync(USERS_DB_FILE, 'utf8');
+        if (fs.existsSync(OTP_DB_FILE)) {
+            const data = fs.readFileSync(OTP_DB_FILE, 'utf8');
             return JSON.parse(data);
         }
-        return { users: [], nextId: 1 };
+        return { otps: [] };
     } catch (error) {
-        console.error('Error loading users:', error);
-        return { users: [], nextId: 1 };
+        console.error('Error loading OTPs:', error);
+        return { otps: [] };
     }
 }
 
-function saveUsers(data) {
+function saveOTPs(data) {
     try {
-        fs.writeFileSync(USERS_DB_FILE, JSON.stringify(data, null, 2));
+        fs.writeFileSync(OTP_DB_FILE, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {
-        console.error('Error saving users:', error);
+        console.error('Error saving OTPs:', error);
         return false;
     }
 }
 
-// Authentication middleware
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+// OTP Functions
+function generateOTP() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-    if (!token) {
-        return res.status(401).json({ error: 'Access token required' });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ error: 'Invalid or expired token' });
-        }
-        req.user = user;
-        next();
+function storeOTP(identifier, otp, type) {
+    const otpData = loadOTPs();
+    const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    // Remove any existing OTP for this identifier
+    otpData.otps = otpData.otps.filter(item => item.identifier !== identifier);
+    
+    // Add new OTP
+    otpData.otps.push({
+        identifier,
+        otp,
+        type, // 'email' or 'phone'
+        expiryTime: expiryTime.toISOString(),
+        attempts: 0
     });
+    
+    saveOTPs(otpData);
 }
 
-// Property matching function
-function checkPropertyMatches(property) {
-    const requirementsData = loadRequirements();
+function verifyOTP(identifier, otp) {
+    const otpData = loadOTPs();
+    const otpRecord = otpData.otps.find(item => item.identifier === identifier);
     
-    requirementsData.requirements.forEach(requirement => {
-        if (isPropertyMatch(property, requirement)) {
-            sendMatchNotificationEmail(property, requirement);
-        }
-    });
+    if (!otpRecord) {
+        return { success: false, message: 'OTP not found or expired' };
+    }
+    
+    if (new Date() > new Date(otpRecord.expiryTime)) {
+        // Remove expired OTP
+        otpData.otps = otpData.otps.filter(item => item.identifier !== identifier);
+        saveOTPs(otpData);
+        return { success: false, message: 'OTP has expired' };
+    }
+    
+    if (otpRecord.attempts >= 3) {
+        return { success: false, message: 'Too many failed attempts' };
+    }
+    
+    if (otpRecord.otp !== otp) {
+        otpRecord.attempts++;
+        saveOTPs(otpData);
+        return { success: false, message: 'Invalid OTP' };
+    }
+    
+    // OTP is valid, remove it
+    otpData.otps = otpData.otps.filter(item => item.identifier !== identifier);
+    saveOTPs(otpData);
+    
+    return { success: true, message: 'OTP verified successfully' };
 }
 
-function isPropertyMatch(property, requirement) {
-    // Check type match
-    if (requirement.type !== 'any' && property.type !== requirement.type) {
-        return false;
-    }
-    
-    // Check price range
-    const propertyPrice = parseFloat(property.price);
-    if (requirement.minPrice && propertyPrice < parseFloat(requirement.minPrice)) {
-        return false;
-    }
-    if (requirement.maxPrice && propertyPrice > parseFloat(requirement.maxPrice)) {
-        return false;
-    }
-    
-    // Check area range
-    const propertyArea = parseInt(property.area);
-    if (requirement.minArea && propertyArea < parseInt(requirement.minArea)) {
-        return false;
-    }
-    if (requirement.maxArea && propertyArea > parseInt(requirement.maxArea)) {
-        return false;
-    }
-    
-    // Check location (partial match)
-    if (requirement.location && requirement.location !== 'any') {
-        const locationMatch = property.location.toLowerCase().includes(requirement.location.toLowerCase());
-        if (!locationMatch) return false;
-    }
-    
-    // Check BHK
-    if (requirement.bhk && requirement.bhk !== 'any') {
-        if (!property.bhk.toLowerCase().includes(requirement.bhk.toLowerCase())) {
-            return false;
-        }
-    }
-    
-    // Check bathrooms
-    if (requirement.bathrooms && requirement.bathrooms !== 'any') {
-        if (property.bathrooms !== requirement.bathrooms) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-async function sendMatchNotificationEmail(property, requirement) {
+async function sendEmailOTP(email, otp) {
     const mailOptions = {
         from: ADMIN_EMAIL,
-        to: ADMIN_EMAIL,
-        subject: `🏠 Property Match Found!`,
+        to: email,
+        subject: '🔐 Your Property Portal Login OTP',
         html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #667eea;">🎉 Property Match Alert!</h2>
-                
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                    <h3 style="color: #2c3e50;">Matched Property:</h3>
-                    <p><strong>Title:</strong> ${property.title}</p>
-                    <p><strong>Type:</strong> ${property.type}</p>
-                    <p><strong>Price:</strong> ₹${property.price} ${property.type === 'sale' ? 'Cr' : 'Lakh/month'}</p>
-                    <p><strong>Area:</strong> ${property.area} Sq Ft</p>
-                    <p><strong>Location:</strong> ${property.location}</p>
-                    <p><strong>Configuration:</strong> ${property.bhk}</p>
-                    <p><strong>Bathrooms:</strong> ${property.bathrooms || 'N/A'}</p>
-                    <p><strong>Contact:</strong> ${property.contact}</p>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🏠 Property Portal</h1>
+                    <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Your Login Verification Code</p>
                 </div>
                 
-                <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                    <h3 style="color: #27ae60;">Matched Requirement:</h3>
-                    <p><strong>Client Name:</strong> ${requirement.clientName}</p>
-                    <p><strong>Contact:</strong> ${requirement.clientContact}</p>
-                    <p><strong>Email:</strong> ${requirement.clientEmail}</p>
-                    <p><strong>Type:</strong> ${requirement.type}</p>
-                    <p><strong>Budget:</strong> ₹${requirement.minPrice || '0'} - ₹${requirement.maxPrice || '∞'} ${requirement.type === 'sale' ? 'Cr' : 'Lakh/month'}</p>
-                    <p><strong>Preferred Area:</strong> ${requirement.minArea || '0'} - ${requirement.maxArea || '∞'} Sq Ft</p>
-                    <p><strong>Location:</strong> ${requirement.location || 'Any'}</p>
-                    <p><strong>Configuration:</strong> ${requirement.bhk || 'Any'}</p>
+                <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; margin: 20px 0; text-align: center;">
+                    <h2 style="color: #2c3e50; margin-bottom: 20px;">Your OTP Code</h2>
+                    <div style="background: white; padding: 20px; border-radius: 10px; display: inline-block; border: 2px solid #667eea;">
+                        <span style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px;">${otp}</span>
+                    </div>
+                    <p style="color: #7f8c8d; margin-top: 20px;">This OTP will expire in 10 minutes</p>
                 </div>
                 
-                <p style="color: #7f8c8d; font-size: 14px;">
-                    This email was automatically generated when a new property matched an existing requirement.
-                </p>
+                <div style="text-align: center; color: #7f8c8d; font-size: 14px;">
+                    <p>If you didn't request this OTP, please ignore this email.</p>
+                    <p>© 2024 Property Portal - Secure Property Management</p>
+                </div>
             </div>
         `
     };
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('Match notification email sent successfully');
+        return true;
     } catch (error) {
         console.error('Error sending email:', error);
+        return false;
     }
 }
 
@@ -318,45 +260,66 @@ function initializeDatabase() {
         const initialProperties = [
             {
                 id: 1,
-                title: "IDEB Springfield Penthouse",
+                title: "Luxury Apartment in Koramangala",
                 type: "sale",
-                bhk: "4BHK",
-                bathrooms: "4",
-                area: "2554",
-                price: "3.45",
-                location: "Sarjapur Road",
-                facing: "West",
+                bhk: "3BHK",
+                bathrooms: "3",
+                area: "1800",
+                price: "2.5",
+                location: "Koramangala 4th Block",
+                facing: "East",
                 furnished: "Semi Furnished",
                 parking: "2 Covered",
-                description: "4bhk 4 Toilet, SBA Around 2554 Sqft including Terrace Area, B Khata property E khata is available, Two Covered Parking",
+                description: "Beautiful 3BHK apartment with modern amenities, prime location near metro station and IT parks.",
                 images: [],
                 videos: [],
-                contact: "9902925519",
+                contact: "9123456789",
+                createdBy: "system",
                 createdAt: new Date().toISOString()
             },
             {
                 id: 2,
-                title: "Modern Apartment Koramangala",
+                title: "Premium Villa in Whitefield",
+                type: "sale",
+                bhk: "4BHK",
+                bathrooms: "4",
+                area: "3200",
+                price: "4.75",
+                location: "Whitefield ITPL Road",
+                facing: "North",
+                furnished: "Fully Furnished",
+                parking: "3 Covered",
+                description: "Spacious villa with garden, modern kitchen, and excellent connectivity to tech parks.",
+                images: [],
+                videos: [],
+                contact: "9876543210",
+                createdBy: "system",
+                createdAt: new Date().toISOString()
+            },
+            {
+                id: 3,
+                title: "Cozy 2BHK for Rent",
                 type: "rent",
                 bhk: "2BHK",
                 bathrooms: "2",
                 area: "1200",
-                price: "0.45",
-                location: "Koramangala 4th Block",
-                facing: "North",
+                price: "0.35",
+                location: "HSR Layout",
+                facing: "South",
                 furnished: "Fully Furnished",
                 parking: "1 Covered",
-                description: "Fully furnished 2BHK in prime Koramangala location. Near metro, restaurants, and IT parks.",
+                description: "Ready to move 2BHK apartment with all amenities, perfect for young professionals.",
                 images: [],
                 videos: [],
-                contact: "9123456789",
+                contact: "9988776655",
+                createdBy: "system",
                 createdAt: new Date().toISOString()
             }
         ];
 
         const dbData = {
             properties: initialProperties,
-            nextId: 3
+            nextId: 4
         };
 
         saveProperties(dbData);
@@ -367,86 +330,114 @@ function initializeDatabase() {
     return dbData;
 }
 
+// Authentication middleware
+function authenticateUser(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+
+    // Simple token validation (in production, use JWT)
+    const usersData = loadUsers();
+    const user = usersData.users.find(u => u.sessionToken === token);
+    
+    if (!user) {
+        return res.status(403).json({ error: 'Invalid or expired session' });
+    }
+
+    req.user = user;
+    next();
+}
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Authentication routes
-app.post('/api/register', async (req, res) => {
+app.post('/api/send-otp', async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { identifier, type } = req.body; // identifier can be email or phone
         
-        if (!username || !email || !password) {
-            return res.status(400).json({ error: 'All fields are required' });
+        if (!identifier || !type) {
+            return res.status(400).json({ error: 'Identifier and type are required' });
         }
         
-        const usersData = loadUsers();
+        const otp = generateOTP();
+        storeOTP(identifier, otp, type);
         
-        // Check if user already exists
-        const existingUser = usersData.users.find(user => user.email === email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'User already exists with this email' });
-        }
-        
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        const newUser = {
-            id: usersData.nextId,
-            username,
-            email,
-            password: hashedPassword,
-            createdAt: new Date().toISOString()
-        };
-        
-        usersData.users.push(newUser);
-        usersData.nextId++;
-        
-        if (saveUsers(usersData)) {
-            const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
-            res.status(201).json({ 
-                message: 'User registered successfully',
-                token,
-                user: { id: newUser.id, username: newUser.username, email: newUser.email }
-            });
+        if (type === 'email') {
+            const emailSent = await sendEmailOTP(identifier, otp);
+            if (emailSent) {
+                res.json({ message: 'OTP sent to your email successfully' });
+            } else {
+                res.status(500).json({ error: 'Failed to send email OTP' });
+            }
+        } else if (type === 'phone') {
+            // For demo purposes, we'll just return success
+            // In production, integrate with SMS service like Twilio
+            console.log(`SMS OTP for ${identifier}: ${otp}`);
+            res.json({ message: 'OTP sent to your phone successfully' });
         } else {
-            res.status(500).json({ error: 'Failed to save user' });
+            res.status(400).json({ error: 'Invalid type. Use "email" or "phone"' });
         }
     } catch (error) {
-        console.error('Error registering user:', error);
+        console.error('Error sending OTP:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/verify-otp', (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { identifier, otp, name } = req.body;
         
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+        if (!identifier || !otp) {
+            return res.status(400).json({ error: 'Identifier and OTP are required' });
         }
         
+        const verificationResult = verifyOTP(identifier, otp);
+        
+        if (!verificationResult.success) {
+            return res.status(400).json({ error: verificationResult.message });
+        }
+        
+        // OTP verified, create or update user
         const usersData = loadUsers();
-        const user = usersData.users.find(u => u.email === email);
+        let user = usersData.users.find(u => u.identifier === identifier);
         
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            // Create new user
+            user = {
+                id: usersData.nextId,
+                identifier,
+                name: name || 'User',
+                sessionToken: 'token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                createdAt: new Date().toISOString()
+            };
+            usersData.users.push(user);
+            usersData.nextId++;
+        } else {
+            // Update existing user
+            user.sessionToken = 'token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            user.lastLogin = new Date().toISOString();
+            if (name) user.name = name;
         }
         
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (!passwordMatch) {
-            return res.status(401).json({ error: 'Invalid email or password' });
-        }
+        saveUsers(usersData);
         
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({ 
+        res.json({
             message: 'Login successful',
-            token,
-            user: { id: user.id, username: user.username, email: user.email }
+            user: {
+                id: user.id,
+                name: user.name,
+                identifier: user.identifier
+            },
+            token: user.sessionToken
         });
     } catch (error) {
-        console.error('Error logging in:', error);
+        console.error('Error verifying OTP:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -462,7 +453,7 @@ app.get('/api/properties', (req, res) => {
             location, facing, minArea, maxArea, furnished 
         } = req.query;
         
-        // Apply filters (same as before)
+        // Apply filters
         if (search) {
             const searchLower = search.toLowerCase();
             filteredProperties = filteredProperties.filter(property => 
@@ -541,7 +532,7 @@ app.get('/api/properties/:id', (req, res) => {
     }
 });
 
-app.post('/api/properties', authenticateToken, upload.fields([
+app.post('/api/properties', authenticateUser, upload.fields([
     { name: 'images', maxCount: 10 },
     { name: 'videos', maxCount: 5 }
 ]), (req, res) => {
@@ -560,6 +551,7 @@ app.post('/api/properties', authenticateToken, upload.fields([
             id: dbData.nextId,
             title, type, bhk, bathrooms: bathrooms || "1", area, price, location, facing,
             furnished, parking, description, contact, images, videos,
+            createdBy: req.user.identifier,
             createdAt: new Date().toISOString()
         };
         
@@ -567,8 +559,6 @@ app.post('/api/properties', authenticateToken, upload.fields([
         dbData.nextId++;
         
         if (saveProperties(dbData)) {
-            // Check for matches with existing requirements
-            checkPropertyMatches(newProperty);
             res.status(201).json(newProperty);
         } else {
             res.status(500).json({ error: 'Failed to save property' });
@@ -579,95 +569,8 @@ app.post('/api/properties', authenticateToken, upload.fields([
     }
 });
 
-app.put('/api/properties/:id', authenticateToken, upload.fields([
-    { name: 'images', maxCount: 10 },
-    { name: 'videos', maxCount: 5 }
-]), (req, res) => {
-    try {
-        const dbData = loadProperties();
-        const propertyIndex = dbData.properties.findIndex(p => p.id === parseInt(req.params.id));
-        
-        if (propertyIndex === -1) {
-            return res.status(404).json({ error: 'Property not found' });
-        }
-        
-        const {
-            title, type, bhk, bathrooms, area, price, location, facing, 
-            furnished, parking, description, contact
-        } = req.body;
-        
-        const existingProperty = dbData.properties[propertyIndex];
-        const images = req.files?.images?.map(file => `/uploads/${file.filename}`) || existingProperty.images;
-        const videos = req.files?.videos?.map(file => `/uploads/${file.filename}`) || existingProperty.videos;
-        
-        const updatedProperty = {
-            ...existingProperty,
-            title, type, bhk, bathrooms: bathrooms || existingProperty.bathrooms, 
-            area, price, location, facing, furnished, parking, description, contact,
-            images, videos, updatedAt: new Date().toISOString()
-        };
-        
-        dbData.properties[propertyIndex] = updatedProperty;
-        
-        if (saveProperties(dbData)) {
-            res.json(updatedProperty);
-        } else {
-            res.status(500).json({ error: 'Failed to update property' });
-        }
-    } catch (error) {
-        console.error('Error updating property:', error);
-        res.status(500).json({ error: 'Failed to update property' });
-    }
-});
-
-app.delete('/api/properties/:id', authenticateToken, (req, res) => {
-    try {
-        const dbData = loadProperties();
-        const propertyIndex = dbData.properties.findIndex(p => p.id === parseInt(req.params.id));
-        
-        if (propertyIndex === -1) {
-            return res.status(404).json({ error: 'Property not found' });
-        }
-        
-        const property = dbData.properties[propertyIndex];
-        
-        // Delete associated files
-        [...property.images, ...property.videos].forEach(filePath => {
-            const fullPath = path.join(__dirname, filePath);
-            if (fs.existsSync(fullPath)) {
-                try {
-                    fs.unlinkSync(fullPath);
-                } catch (fileError) {
-                    console.error('Error deleting file:', fullPath, fileError);
-                }
-            }
-        });
-        
-        dbData.properties.splice(propertyIndex, 1);
-        
-        if (saveProperties(dbData)) {
-            res.json({ message: 'Property deleted successfully' });
-        } else {
-            res.status(500).json({ error: 'Failed to delete property' });
-        }
-    } catch (error) {
-        console.error('Error deleting property:', error);
-        res.status(500).json({ error: 'Failed to delete property' });
-    }
-});
-
 // Requirements routes
-app.get('/api/requirements', (req, res) => {
-    try {
-        const requirementsData = loadRequirements();
-        res.json(requirementsData.requirements);
-    } catch (error) {
-        console.error('Error getting requirements:', error);
-        res.status(500).json({ error: 'Failed to load requirements' });
-    }
-});
-
-app.post('/api/requirements', (req, res) => {
+app.post('/api/requirements', authenticateUser, (req, res) => {
     try {
         const {
             clientName, clientEmail, clientContact, type, minPrice, maxPrice,
@@ -680,6 +583,7 @@ app.post('/api/requirements', (req, res) => {
             id: requirementsData.nextId,
             clientName, clientEmail, clientContact, type, minPrice, maxPrice,
             minArea, maxArea, location, bhk, bathrooms, furnished, additionalRequirements,
+            createdBy: req.user.identifier,
             createdAt: new Date().toISOString()
         };
         
@@ -687,14 +591,6 @@ app.post('/api/requirements', (req, res) => {
         requirementsData.nextId++;
         
         if (saveRequirements(requirementsData)) {
-            // Check existing properties for matches
-            const propertiesData = loadProperties();
-            propertiesData.properties.forEach(property => {
-                if (isPropertyMatch(property, newRequirement)) {
-                    sendMatchNotificationEmail(property, newRequirement);
-                }
-            });
-            
             res.status(201).json({ 
                 message: 'Requirement submitted successfully',
                 requirement: newRequirement 
@@ -705,64 +601,6 @@ app.post('/api/requirements', (req, res) => {
     } catch (error) {
         console.error('Error adding requirement:', error);
         res.status(500).json({ error: 'Failed to add requirement' });
-    }
-});
-
-// Media upload
-app.post('/api/upload-media', authenticateToken, mediaUpload.array('media', 20), (req, res) => {
-    try {
-        const { bucket, title, description } = req.body;
-        const files = req.files || [];
-        
-        if (files.length === 0) {
-            return res.status(400).json({ error: 'No files uploaded' });
-        }
-        
-        const mediaData = loadMedia();
-        
-        const uploadedFiles = files.map(file => ({
-            id: mediaData.nextId++,
-            originalName: file.originalname,
-            filename: file.filename,
-            path: `/media/${bucket}/${file.filename}`,
-            size: file.size,
-            mimetype: file.mimetype,
-            bucket: bucket || 'bucket1',
-            title: title || file.originalname,
-            description: description || '',
-            uploadedAt: new Date().toISOString()
-        }));
-        
-        mediaData.media.push(...uploadedFiles);
-        
-        if (saveMedia(mediaData)) {
-            res.status(201).json({
-                message: 'Files uploaded successfully',
-                files: uploadedFiles
-            });
-        } else {
-            res.status(500).json({ error: 'Failed to save media data' });
-        }
-    } catch (error) {
-        console.error('Error uploading media:', error);
-        res.status(500).json({ error: 'Failed to upload media' });
-    }
-});
-
-app.get('/api/media', (req, res) => {
-    try {
-        const { bucket } = req.query;
-        const mediaData = loadMedia();
-        
-        let files = mediaData.media;
-        if (bucket && bucket !== 'all') {
-            files = files.filter(file => file.bucket === bucket);
-        }
-        
-        res.json(files);
-    } catch (error) {
-        console.error('Error getting media:', error);
-        res.status(500).json({ error: 'Failed to load media' });
     }
 });
 
@@ -795,7 +633,7 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString(),
         propertiesCount: loadProperties().properties.length,
         requirementsCount: loadRequirements().requirements.length,
-        mediaCount: loadMedia().media.length
+        usersCount: loadUsers().users.length
     });
 });
 
@@ -803,9 +641,9 @@ app.get('/api/health', (req, res) => {
 initializeDatabase();
 
 app.listen(PORT, () => {
-    console.log(`🚀 Enhanced Property Listing Server running on port ${PORT}`);
+    console.log(`🚀 Property Listing Server with OTP Authentication running on port ${PORT}`);
     console.log(`📊 Loaded ${loadProperties().properties.length} properties`);
+    console.log(`👥 Loaded ${loadUsers().users.length} users`);
     console.log(`📋 Loaded ${loadRequirements().requirements.length} requirements`);
-    console.log(`📁 Media storage buckets created: bucket1, bucket2, bucket3`);
     console.log(`💾 Database files initialized`);
 });

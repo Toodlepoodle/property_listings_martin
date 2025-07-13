@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Property - Property Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .file-upload {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .file-upload:hover {
+            border-color: #4facfe;
+            background: #e3f2fd;
+            transform: translateY(-2px);
+        }
+
+        .file-upload i {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .file-upload p {
+            color: #667eea;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .file-upload.active {
+            border-color: #4facfe;
+            background: #e8f5e8;
+        }
+
+        .file-upload.active i {
+            color: #4facfe;
+        }
+
+        .file-upload.active p {
+            color: #4facfe;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(79, 172, 254, 0.6);
+        }
+
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .preview-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid #e8e8e8;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .preview-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .preview-video {
+            width: 100%;
+            height: 120px;
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .form-container {
+                padding: 25px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Back to Properties
+        </a>
+
+        <div class="header">
+            <h1><i class="fas fa-plus-circle"></i> Add New Property</h1>
+            <p>List your property and reach thousands of potential buyers/tenants!</p>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            <i class="fas fa-user"></i>
+            <span>Loading user information...</span>
+        </div>
+
+        <div class="form-container">
+            <form id="addPropertyForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="title"><i class="fas fa-tag"></i> Property Title</label>
+                    <input type="text" id="title" name="title" required placeholder="Enter an attractive property title">
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="type"><i class="fas fa-handshake"></i> Transaction Type</label>
+                        <select id="type" name="type" required>
+                            <option value="sale">For Sale</option>
+                            <option value="rent">For Rent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bhk"><i class="fas fa-bed"></i> BHK Configuration</label>
+                        <input type="text" id="bhk" name="bhk" placeholder="e.g., 3BHK, 2.5BHK" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bathrooms"><i class="fas fa-bath"></i> Number of Bathrooms</label>
+                        <input type="number" id="bathrooms" name="bathrooms" placeholder="Enter number of bathrooms" min="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="area"><i class="fas fa-ruler-combined"></i> Area (Square Feet)</label>
+                        <input type="number" id="area" name="area" required placeholder="Enter area in sq ft">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="price"><i class="fas fa-rupee-sign"></i> Price</label>
+                        <input type="number" id="price" name="price" step="0.01" required placeholder="For Sale: Crores | For Rent: Lakhs per month">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="location"><i class="fas fa-map-marker-alt"></i> Location</label>
+                        <input type="text" id="location" name="location" required placeholder="Enter location/area">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="facing"><i class="fas fa-compass"></i> Facing Direction</label>
+                        <select id="facing" name="facing">
+                            <option value="North">North</option>
+                            <option value="South">South</option>
+                            <option value="East">East</option>
+                            <option value="West">West</option>
+                            <option value="North-East">North-East</option>
+                            <option value="North-West">North-West</option>
+                            <option value="South-East">South-East</option>
+                            <option value="South-West">South-West</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="furnished"><i class="fas fa-couch"></i> Furnished Status</label>
+                        <select id="furnished" name="furnished">
+                            <option value="Unfurnished">Unfurnished</option>
+                            <option value="Semi Furnished">Semi Furnished</option>
+                            <option value="Fully Furnished">Fully Furnished</option>
+                            <option value="Ready to move-in">Ready to move-in</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="parking"><i class="fas fa-car"></i> Parking Details</label>
+                        <input type="text" id="parking" name="parking" placeholder="e.g., 2 Covered, 1 Open">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contact"><i class="fas fa-phone"></i> Contact Number</label>
+                        <input type="tel" id="contact" name="contact" required placeholder="Enter contact number">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description"><i class="fas fa-align-left"></i> Property Description</label>
+                    <textarea id="description" name="description" rows="4" required placeholder="Describe the property features, amenities, and other details that make it special"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-images"></i> Property Images</label>
+                    <div class="file-upload" onclick="document.getElementById('images').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p id="imageUploadText">Click to upload property images (Max 10 images)</p>
+                        <input type="file" id="images" name="images" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
+                    </div>
+                    <div id="imagePreview" class="preview-section" style="display: none;">
+                        <h4>Selected Images:</h4>
+                        <div id="imageGrid" class="preview-grid"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-video"></i> Property Videos</label>
+                    <div class="file-upload" onclick="document.getElementById('videos').click()">
+                        <i class="fas fa-video"></i>
+                        <p id="videoUploadText">Click to upload property videos (Max 5 videos)</p>
+                        <input type="file" id="videos" name="videos" multiple accept="video/*" style="display: none;" onchange="handleVideoUpload(this)">
+                    </div>
+                    <div id="videoPreview" class="preview-section" style="display: none;">
+                        <h4>Selected Videos:</h4>
+                        <div id="videoGrid" class="preview-grid"></div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Add Property to Listings
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('userData');
+        
+        if (!token || !userData) {
+            alert('Please login first to add properties');
+            window.location.href = '/';
+        }
+
+        const currentUser = JSON.parse(userData);
+        
+        // Display user info
+        document.getElementById('userInfo').innerHTML = `
+            <i class="fas fa-user"></i>
+            Welcome, ${currentUser.name}! (${currentUser.identifier})
+        `;
+
+        // Pre-fill contact with user identifier if it's a phone number
+        if (!currentUser.identifier.includes('@')) {
+            document.getElementById('contact').value = currentUser.identifier;
+        }
+
+        let selectedImages = [];
+        let selectedVideos = [];
+
+        function handleImageUpload(input) {
+            const files = Array.from(input.files);
+            
+            if (files.length > 10) {
+                alert('Maximum 10 images allowed');
+                input.value = '';
+                return;
+            }
+
+            selectedImages = files;
+            displayImagePreviews();
+            
+            const uploadDiv = input.parentElement;
+            uploadDiv.classList.add('active');
+            document.getElementById('imageUploadText').innerHTML = `
+                <i class="fas fa-check" style="color: #4facfe; margin-right: 8px;"></i>
+                ${files.length} image(s) selected
+            `;
+        }
+
+        function handleVideoUpload(input) {
+            const files = Array.from(input.files);
+            
+            if (files.length > 5) {
+                alert('Maximum 5 videos allowed');
+                input.value = '';
+                return;
+            }
+
+            selectedVideos = files;
+            displayVideoPreviews();
+            
+            const uploadDiv = input.parentElement;
+            uploadDiv.classList.add('active');
+            document.getElementById('videoUploadText').innerHTML = `
+                <i class="fas fa-check" style="color: #4facfe; margin-right: 8px;"></i>
+                ${files.length} video(s) selected
+            `;
+        }
+
+        function displayImagePreviews() {
+            const previewSection = document.getElementById('imagePreview');
+            const imageGrid = document.getElementById('imageGrid');
+            
+            if (selectedImages.length > 0) {
+                previewSection.style.display = 'block';
+                imageGrid.innerHTML = '';
+                
+                selectedImages.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'preview-item';
+                        previewItem.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview" class="preview-image">
+                            <button type="button" class="remove-btn" onclick="removeImage(${index})">×</button>
+                        `;
+                        imageGrid.appendChild(previewItem);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                previewSection.style.display = 'none';
+            }
+        }
+
+        function displayVideoPreviews() {
+            const previewSection = document.getElementById('videoPreview');
+            const videoGrid = document.getElementById('videoGrid');
+            
+            if (selectedVideos.length > 0) {
+                previewSection.style.display = 'block';
+                videoGrid.innerHTML = '';
+                
+                selectedVideos.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'preview-item';
+                        previewItem.innerHTML = `
+                            <video src="${e.target.result}" class="preview-video" controls muted></video>
+                            <button type="button" class="remove-btn" onclick="removeVideo(${index})">×</button>
+                        `;
+                        videoGrid.appendChild(previewItem);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                previewSection.style.display = 'none';
+            }
+        }
+
+        function removeImage(index) {
+            selectedImages.splice(index, 1);
+            
+            // Update file input
+            const dataTransfer = new DataTransfer();
+            selectedImages.forEach(file => dataTransfer.items.add(file));
+            document.getElementById('images').files = dataTransfer.files;
+            
+            displayImagePreviews();
+            
+            if (selectedImages.length === 0) {
+                document.getElementById('imageUploadText').textContent = 'Click to upload property images (Max 10 images)';
+                document.querySelector('#images').parentElement.classList.remove('active');
+            } else {
+                document.getElementById('imageUploadText').innerHTML = `
+                    <i class="fas fa-check" style="color: #4facfe; margin-right: 8px;"></i>
+                    ${selectedImages.length} image(s) selected
+                `;
+            }
+        }
+
+        function removeVideo(index) {
+            selectedVideos.splice(index, 1);
+            
+            // Update file input
+            const dataTransfer = new DataTransfer();
+            selectedVideos.forEach(file => dataTransfer.items.add(file));
+            document.getElementById('videos').files = dataTransfer.files;
+            
+            displayVideoPreviews();
+            
+            if (selectedVideos.length === 0) {
+                document.getElementById('videoUploadText').textContent = 'Click to upload property videos (Max 5 videos)';
+                document.querySelector('#videos').parentElement.classList.remove('active');
+            } else {
+                document.getElementById('videoUploadText').innerHTML = `
+                    <i class="fas fa-check" style="color: #4facfe; margin-right: 8px;"></i>
+                    ${selectedVideos.length} video(s) selected
+                `;
+            }
+        }
+
+        // Form submission
+        document.getElementById('addPropertyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding Property...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/properties', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    alert('Property added successfully! It will be visible to all users.');
+                    window.location.href = '/';
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.error}`);
+                }
+            } catch (error) {
+                console.error('Error adding property:', error);
+                alert('Error adding property. Please try again.');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Auto-update price placeholder based on type
+        document.getElementById('type').addEventListener('change', function() {
+            const priceInput = document.getElementById('price');
+            if (this.value === 'sale') {
+                priceInput.placeholder = 'Enter price in Crores (e.g., 2.5 for ₹2.5 Cr)';
+            } else {
+                priceInput.placeholder = 'Enter monthly rent in Lakhs (e.g., 0.5 for ₹50,000/month)';
+            }
+        });
+    </script>
+</body>
+</html>
