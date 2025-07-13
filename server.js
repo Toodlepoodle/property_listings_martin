@@ -16,7 +16,7 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'adiiroy67@gmail.com';
 const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD || 'ggji sbkc bufx iyqa';
 
 // Email configuration
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
     service: 'gmail', // or your email service
     auth: {
         user: ADMIN_EMAIL,
